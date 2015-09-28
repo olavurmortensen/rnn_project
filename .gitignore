@@ -3,3 +3,4 @@
 small_vocab_word_vocab
 small_vocab_word_vecs.npy
 
+*.pyc
