@@ -186,16 +186,12 @@ if __name__ == "__main__":
             # print ' '.join(words)
             words = [w for w in words if w in word2vec_vocab]
             # print ' '.join(words)
-            for i in idx:
-                encoded_string_words, mask_words = encode_str(words[i:(i+3)], word2vec_vocab, MAX_SEQ_LEN)
-                encoded_sequences_word.append(encoded_string_words)
-                masks_word.append(mask_words)
+            encoded_string_words, mask_words = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
+            encoded_sequences_word.append(encoded_string_words)
+            masks_word.append(mask_words)
 
-
-                xx = [word2vec_vocab[w] for w in words[(i+3):(i+4)] if w in word2vec_vocab]+[EOS]
-                xx = xx + [EOS]*(MAX_SEQ_LEN+1-len(xx))
-                target_vals.append(xx)
-
+            xx = word2vec_vocab[words[-1]] if words[-1] in word2vec_vocab else EOS  # TODO: what to do with missing words?
+            target_vals.append(xx)
 
     print "Num samples %i" % len(masks_word)
 
