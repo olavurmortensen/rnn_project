@@ -31,7 +31,7 @@ def load_sentences(num_sents=None):
         for sel1 in root.findall('s'):
             sentence = []
             for sel2 in sel1.findall('w'):
-                sentence.append(sel2.text)
+                sentence.append(sel2.text.lower())
             sentences.append(sentence)
 
 

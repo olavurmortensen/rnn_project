@@ -26,11 +26,6 @@ import logging
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-umls_db_name = "UMLS2015"
-user = 'root'
-password = 'findzebra'
-umls_db_host = '62.61.146.181'
-
 
 def encode_str(text, token_dict, max_seq_len):
     text = ([c for c in text if c in token_dict])
@@ -41,7 +36,7 @@ def encode_str(text, token_dict, max_seq_len):
     mask = np.asarray([1]*len(text) + [0]*remainder, dtype=np.float32)
     return enc_str, mask
 
-def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU):
+def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU, learning_rate):
     # Create data for testing network dimensions
     x_sym = T.imatrix()
     y_sym = T.imatrix()
@@ -97,7 +92,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     all_grads = [T.clip(g,-3,3) for g in T.grad(mean_cost, all_trainable_parameters)]
     all_grads = lasagne.updates.total_norm_constraint(all_grads,3)
 
-    updates = lasagne.updates.adam(all_grads, all_trainable_parameters, learning_rate=0.005) # adaptive learning rate should be implemented...
+    updates = lasagne.updates.adam(all_grads, all_trainable_parameters, learning_rate=learning_rate) # adaptive learning rate should be implemented...
 
     train_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc], updates=updates)
     test_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc])
@@ -118,11 +113,13 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    MIN_WORD_FREQ = 5
+    learning_rate = 0.0005
     NUM_SENTENCES = 10000
-    BATCH_SIZE = 128
+    MIN_WORD_FREQ = 5
+
     NUM_UNITS_GRU = 150
-    MAX_SEQ_LEN = 5
+    BATCH_SIZE = 128
+    MAX_SEQ_LEN = 5  # TODO: value?
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.
@@ -168,12 +165,20 @@ if __name__ == "__main__":
         
         if not words:
             continue
-        
+
+        # Words up to the last word.
         encoded_words, mask = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
         encoded_sequences.append(encoded_words)
         masks.append(mask)
 
-        xx = word2vec_vocab[words[-1]] if words[-1] in word2vec_vocab else EOS  # TODO: what to do with missing words?
+        if len(words) > MAX_SEQ_LEN:
+            idx = MAX_SEQ_LEN
+        else:
+            idx = -1
+
+        # Last word.
+        pred_word = words[idx]
+        xx = word2vec_vocab[pred_word] if pred_word in word2vec_vocab else EOS  # TODO: what to do with missing words?
         target_vals.append(xx)
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
@@ -181,7 +186,7 @@ if __name__ == "__main__":
 
     y = np.vstack(target_vals).astype('int32')
 
-    output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU)
+    output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU, learning_rate)
 
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
