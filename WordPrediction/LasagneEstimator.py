@@ -43,6 +43,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     xmask_sym = T.matrix()
 
     NUM_OUTPUTS = int(NUM_WORDS + 1)
+    print 'NUM_OUTPUTS: %d' % NUM_OUTPUTS
     
     X = np.random.randint(0, NUM_WORDS, size=(BATCH_SIZE, MAX_SEQ_LEN)).astype('int32')
     Xmask = np.ones((BATCH_SIZE, MAX_SEQ_LEN)).astype('float32')
