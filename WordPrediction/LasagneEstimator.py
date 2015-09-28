@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from data_generator import load_sentences
 from LasagneNet import *
 from RepeatLayer import RepeatLayer
 from os.path import join
@@ -20,6 +21,10 @@ import cPickle as pickle
 import gzip
 #from SolrSearchModel import *
 import nltk
+
+import logging
+
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 umls_db_name = "UMLS2015"
 user = 'root'
@@ -113,51 +118,40 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    NUM_DOCS = 50
+    MIN_WORD_FREQ = 5
+    NUM_SENTENCES = 10000
+    BATCH_SIZE = 128
+    NUM_UNITS_GRU = 150
+    MAX_SEQ_LEN = 5
+    EOS = -1
 
+    # Load vocabulary and pre-trained word2vec word vectors.
     WEIGHTS = np.load('small_vocab_word_vecs.npy').astype('float32')
     with open('small_vocab_word_vocab', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
-    # from gensim.models import word2vec
-    # model = word2vec.Word2Vec.load_word2vec_format('C:/data/word2vec/GoogleNews-vectors-negative300.bin', binary=True)
-    # word2vec_vocab = model.vocab
-    # word2vec_small = model.syn0
+    # Load list of sentences from OpenSubtitles data (each sentence is a list of words).
+    sentences = load_sentences(NUM_SENTENCES)
 
-
-    # build network
-    BATCH_SIZE = 128
-    NUM_UNITS_GRU = 150
-    NUM_SAMPLES_PR_ARTICLE = 500
-    MAX_SEQ_LEN = 5
-    EOS = -1
-
-
-    # NUM_UNITS_ENC_WORD = 250
-
-    char_dict = {}
+    # Find the set of words that are in the data (and their frequencies).
     word_set = {}
-    sql = 'select p.text, p.display_title FROM page p, watson_questions where answer = p.display_title and length(p.text)>150 limit 0,%i'%NUM_DOCS
-    # sql = "select p.text, p.display_title FROM page p, watson_questions where answer = p.display_title and length(p.text)>150 limit 0,50000"
-    db_iter = SimpleDatabaseIterator(umls_db_host, 'findzebra2', user, password, sql) # laptop
-    for row in db_iter:
-        # print row['display_title']
-        text = row['text'].lower()
-        words = nltk.word_tokenize(text)
-        for w in words:
+    for sentence in sentences:
+        for w in sentence:
             if w in word2vec_vocab:
-                if w not in word_set:
+                if not w in word_set:
                     word_set[w] = 0
                 word_set[w] += 1
 
-    word_list = [w for w in word_set if word_set[w] > 5]
-    word_set = {}
+    # Only keep words with frequency higher than MIN_WORD_FREQ.
+    word_list = [w for w in word_set if word_set[w] > MIN_WORD_FREQ]
 
+    # Only use word2vec vectors that are in the set of words.
     new_W = []
+    word_set = {}
     for i, w in enumerate(word_list):
         word_set[w] = i
-        new_W.append(WEIGHTS[word2vec_vocab[w],:])
+        new_W.append(WEIGHTS[word2vec_vocab[w], :])
 
     WEIGHTS = np.vstack(new_W)
     word2vec_vocab = word_set
@@ -165,52 +159,34 @@ if __name__ == "__main__":
     word_embedding_size = WEIGHTS.shape[1]
     num_words = WEIGHTS.shape[0]
 
-
-    """
-    Generate training data
-    """
-    encoded_sequences_word = []
-    masks_word = []
-    sentences = {}
+    # Prepare the data structure that will go into the network (lists of encoded words).
+    encoded_sequences = []
+    masks = []
     target_vals = []
-    db_iter = SimpleDatabaseIterator(umls_db_host, 'findzebra2', user, password, sql) # laptop
-    for row in db_iter:
-        text = row['text'].lower()
-        title = row['display_title'].lower()
-        sentences = nltk.sent_tokenize(text)
-        for sent in sentences:
-            idx = range(0, len(sent)-6)
-            words = nltk.word_tokenize(sent)
-            if len(words) < 8:
-                continue
-            # print ' '.join(words)
-            words = [w for w in words if w in word2vec_vocab]
-            # print ' '.join(words)
-            encoded_string_words, mask_words = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
-            encoded_sequences_word.append(encoded_string_words)
-            masks_word.append(mask_words)
+    for sentence in sentences:
+        words = [w for w in sentence if w in word2vec_vocab]
+        
+        if not words:
+            continue
+        
+        encoded_words, mask = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
+        encoded_sequences.append(encoded_words)
+        masks.append(mask)
 
-            xx = word2vec_vocab[words[-1]] if words[-1] in word2vec_vocab else EOS  # TODO: what to do with missing words?
-            target_vals.append(xx)
+        xx = word2vec_vocab[words[-1]] if words[-1] in word2vec_vocab else EOS  # TODO: what to do with missing words?
+        target_vals.append(xx)
 
-    print "Num samples %i" % len(masks_word)
-
-    encoded_sequences_word = np.vstack(encoded_sequences_word).astype('int32')
-    masks_word = np.vstack(masks_word).astype('int32')
+    encoded_sequences = np.vstack(encoded_sequences).astype('int32')
+    masks = np.vstack(masks).astype('int32')
 
     y = np.vstack(target_vals).astype('int32')
 
-
-    
-
     output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU)
-
 
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-
-    X = {'X': encoded_sequences_word, 'X_mask': masks_word }
+    X = {'X': encoded_sequences, 'X_mask': masks}
 
     estimator.fit(X, y)
 
