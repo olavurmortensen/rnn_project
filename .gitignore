@@ -6,5 +6,8 @@ small_vocab_word_vecs.npy
 # Parameters from network that are saved.
 saved_params*
 
+# Data.
+OpenSubtitlesSentences
+
 *.pyc
 *.swp

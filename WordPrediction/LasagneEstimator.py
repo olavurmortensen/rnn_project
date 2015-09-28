@@ -59,7 +59,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
     l_mask = lasagne.layers.InputLayer((None, MAX_SEQ_LEN), name='input_mask')
 
-    l_gru = lasagne.layers.GRULayer(l_emb, num_units=NUM_UNITS_GRU, name='gru', mask_input=l_mask)
+    l_gru = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='gru', mask_input=l_mask)
     print "gru shape: %s" % str(lasagne.layers.get_output(l_gru, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
         {x_sym: X, xmask_sym: Xmask}).shape)
 
@@ -92,7 +92,11 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     all_grads = [T.clip(g,-3,3) for g in T.grad(mean_cost, all_trainable_parameters)]
     all_grads = lasagne.updates.total_norm_constraint(all_grads,3)
 
-    updates = lasagne.updates.adam(all_grads, all_trainable_parameters, learning_rate=learning_rate) # adaptive learning rate should be implemented...
+    updates = lasagne.updates.nesterov_momentum(
+            all_grads,
+            all_trainable_parameters,
+            learning_rate=learning_rate,
+            momentum=0.9) # adaptive learning rate should be implemented...
 
     train_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc], updates=updates)
     test_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc])
@@ -113,8 +117,8 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.0005
-    NUM_SENTENCES = 10000
+    learning_rate = 0.01
+    momentum = 0.9
     MIN_WORD_FREQ = 5
 
     NUM_UNITS_GRU = 150
@@ -123,13 +127,18 @@ if __name__ == "__main__":
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.
-    WEIGHTS = np.load('small_vocab_word_vecs.npy').astype('float32')
-    with open('small_vocab_word_vocab', 'rb') as f:
+    WEIGHTS = np.load('data/small_vocab_word_vecs.npy').astype('float32')
+    with open('data/small_vocab_word_vocab', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
     # Load list of sentences from OpenSubtitles data (each sentence is a list of words).
-    sentences = load_sentences(NUM_SENTENCES)
+    try:
+        with open('data/OpenSubtitlesSentences', 'rb') as f:
+            sentences = pickle.load(f)
+    except IOError:
+        sentences = load_sentences(10000)
+        pickle.dump(sentences, open('data/OpenSubtitlesSentences', 'wb'))
 
     # Find the set of words that are in the data (and their frequencies).
     word_set = {}
