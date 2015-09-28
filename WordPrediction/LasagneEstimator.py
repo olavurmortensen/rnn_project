@@ -43,7 +43,6 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     xmask_sym = T.matrix()
 
     NUM_OUTPUTS = int(NUM_WORDS + 1)
-    print 'NUM_OUTPUTS: %d' % NUM_OUTPUTS
     
     X = np.random.randint(0, NUM_WORDS, size=(BATCH_SIZE, MAX_SEQ_LEN)).astype('int32')
     Xmask = np.ones((BATCH_SIZE, MAX_SEQ_LEN)).astype('float32')
@@ -84,7 +83,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     mean_cost = T.mean(total_cost) #cost expression
 
     argmax = T.argmax(output_train, axis=-1)
-    eq = T.eq(argmax, y_sym)
+    eq = T.eq(argmax, y_sym.flatten())
     acc = T.mean(eq)  #accuracy
 
     all_trainable_parameters = lasagne.layers.get_all_params([l_softmax], trainable=True)
@@ -114,7 +113,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    NUM_DOCS = 3
+    NUM_DOCS = 50
 
     WEIGHTS = np.load('small_vocab_word_vecs.npy').astype('float32')
     with open('small_vocab_word_vocab', 'rb') as f:
@@ -202,6 +201,7 @@ if __name__ == "__main__":
     y = np.vstack(target_vals).astype('int32')
 
 
+    
 
     output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU)
 

@@ -3,5 +3,8 @@
 small_vocab_word_vocab
 small_vocab_word_vecs.npy
 
+# Parameters from network that are saved.
+saved_params*
+
 *.pyc
 *.swp
