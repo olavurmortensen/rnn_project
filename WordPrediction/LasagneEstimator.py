@@ -83,14 +83,13 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     all_trainable_parameters = lasagne.layers.get_all_params([l_softmax], trainable=True)
 
     #add grad clipping to avoid exploding gradients
-    all_grads = [T.clip(g,-3,3) for g in T.grad(mean_cost, all_trainable_parameters)]
-    all_grads = lasagne.updates.total_norm_constraint(all_grads,3)
+    all_grads = [T.clip(g, -3, 3) for g in T.grad(mean_cost, all_trainable_parameters)]
+    all_grads = lasagne.updates.total_norm_constraint(all_grads, 3)
 
-    updates = lasagne.updates.nesterov_momentum(
+    updates = lasagne.updates.adam(
             all_grads,
             all_trainable_parameters,
-            learning_rate=learning_rate,
-            momentum=0.9) # adaptive learning rate should be implemented...
+            learning_rate=learning_rate,) # adaptive learning rate should be implemented...
 
     train_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc], updates=updates)
     test_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc])
@@ -111,7 +110,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.01
+    learning_rate = 0.001
     momentum = 0.9
     MIN_WORD_FREQ = 5
 
@@ -180,9 +179,8 @@ if __name__ == "__main__":
             idx = -1
 
         # Last word.
-        pred_word = words[idx]
-        xx = word2vec_vocab[pred_word] if pred_word in word2vec_vocab else EOS  # TODO: what to do with missing words?
-        target_vals.append(xx)
+        pred_word = word2vec_vocab[words[idx]]
+        target_vals.append(pred_word)
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
     masks = np.vstack(masks).astype('int32')
@@ -195,10 +193,21 @@ if __name__ == "__main__":
     # estimator.draw_network() # requires networkx package
 
     X = {'X': encoded_sequences, 'X_mask': masks}
-
-    estimator.fit(X, y)
-
-
-
-
-
+    
+    train = False
+    load = True
+    test = True
+    if train:
+        estimator.fit(X, y)
+    if load:
+        estimator.load_weights_from('word_embedding/saved_params_84')
+    if test:
+        predictions = estimator.predict(X)
+        predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
+        word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))
+        for idx in xrange(len(predictions)):
+            line = X['X'][idx][X['X_mask'][idx].astype('bool')]
+            print [word2vec_vocab_rev[w] for w in line]
+            print word2vec_vocab_rev[predictions[idx]]
+        import pdb
+        pdb.set_trace()
