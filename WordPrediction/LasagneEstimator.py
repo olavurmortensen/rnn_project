@@ -1,31 +1,25 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+'''
+Sequence learning using LasagneNet.
+'''
+
 from __future__ import absolute_import
 
 from data_generator import load_sentences
 from LasagneNet import *
 from RepeatLayer import RepeatLayer
-from os.path import join
 import os
-from collections import OrderedDict
-import itertools
-from warnings import warn
 from time import time
-from lasagne.layers import InputLayer
 import lasagne
 import theano.tensor as T
 import numpy as np
 import theano
-from SimpleDatabaseIterator import SimpleDatabaseIterator
-from sklearn.cross_validation import train_test_split
-import codecs
 import cPickle as pickle
-import gzip
-#from SolrSearchModel import *
-import nltk
 
 import logging
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
 
 def encode_str(text, token_dict, max_seq_len):
     text = ([c for c in text if c in token_dict])
