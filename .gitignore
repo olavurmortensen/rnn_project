@@ -8,6 +8,7 @@ saved_params*
 
 # Data.
 OpenSubtitlesSentences
+OpenSubtitlesSentences.pickle
 
 *.pyc
 *.swp

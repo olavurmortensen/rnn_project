@@ -7,6 +7,12 @@ Generate data for RNN chatbot.
 import xml.etree.ElementTree as ET
 import gzip
 import os
+import random
+import pickle
+
+import logging
+
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 def load_sentences(num_sents=None):
     '''
@@ -43,3 +49,37 @@ def load_sentences(num_sents=None):
         sentences = sentences[:num_sents]
 
     return sentences
+
+def group_sentences(sentences):
+    new_sentences = []
+    idx = 0
+    while idx < len(sentences) - 1:
+        new_sentences.append((sentences[idx], sentences[idx + 1]))
+        idx += 1
+    return new_sentences
+
+def randomize_sentences(sentences):
+    new_sentences = []
+    while sentences:
+        rand_idx = random.randint(0, len(sentences) - 1)
+        rand_sent = sentences.pop(rand_idx)
+        new_sentences.append(rand_sent)
+    return new_sentences
+
+
+if __name__ == '__main__':
+    NUM_SENTENCES = 10000
+    sentences = load_sentences(NUM_SENTENCES)
+    logging.info('#Sentences after load: %d', len(sentences))
+
+    grouped_sentences = group_sentences(sentences)
+    logging.info('#Sentence pairs after group: %d', len(grouped_sentences))
+
+    grouped_sentences = randomize_sentences(grouped_sentences)
+    logging.info('#Sentence pairs after randomize: %d', len(grouped_sentences))
+
+    data = {}
+    data['sentences'] = sentences
+    data['grouped_sentences'] = grouped_sentences
+
+    pickle.dump(data, open('data/OpenSubtitlesSentences.pickle', 'wb'))

@@ -113,10 +113,11 @@ if __name__ == "__main__":
     learning_rate = 0.001
     momentum = 0.9
     MIN_WORD_FREQ = 5
+    train_split = 9000
 
     NUM_UNITS_GRU = 150
     BATCH_SIZE = 128
-    MAX_SEQ_LEN = 5  # TODO: value?
+    MAX_SEQ_LEN = 10
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.
@@ -125,14 +126,13 @@ if __name__ == "__main__":
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
-    # Load list of sentences from OpenSubtitles data (each sentence is a list of words).
-    try:
-        with open('data/OpenSubtitlesSentences', 'rb') as f:
-            sentences = pickle.load(f)
-    except IOError:
-        sentences = load_sentences(10000)
-        pickle.dump(sentences, open('data/OpenSubtitlesSentences', 'wb'))
-
+    # Load data.
+    data = pickle.load(open('data/OpenSubtitlesSentences', 'rb'))
+    sentences = data['sentences']
+    sent_pairs = data['grouped_sentences']
+    train_sent_pairs = sent_pairs[:train_split]
+    test_sent_pairs = sent_pairs[train_split:]
+    
     # Find the set of words that are in the data (and their frequencies).
     word_set = {}
     for sentence in sentences:
@@ -158,45 +158,76 @@ if __name__ == "__main__":
     word_embedding_size = WEIGHTS.shape[1]
     num_words = WEIGHTS.shape[0]
 
-    # Prepare the data structure that will go into the network (lists of encoded words).
+    ## Prepare the data structure that will go into the network (lists of encoded words). ##
+
+    # Training data.
     encoded_sequences = []
     masks = []
     target_vals = []
-    for sentence in sentences:
-        words = [w for w in sentence if w in word2vec_vocab]
+    for query, response in train_sent_pairs:
+        # Remove out-of-vocabulary words.
+        query = [w for w in query if w in word2vec_vocab]
+        response = [w for w in response if w in word2vec_vocab]
         
-        if not words:
+        if not query or not response:
             continue
 
-        # Words up to the last word.
-        encoded_words, mask = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
-        encoded_sequences.append(encoded_words)
-        masks.append(mask)
+        # Training examples.
+        for i in range(len(response)):
+            # If sequence exceeds maximum length, continue to next sentence pair.
+            if len(input_seq) > MAX_SEQ_LEN:
+                break
 
-        if len(words) > MAX_SEQ_LEN:
-            idx = MAX_SEQ_LEN
-        else:
-            idx = -1
+            # Input sequence.
+            if i == 0:
+                input_seq = query
+            else:
+                input_seq = query + response[:(i - 1)]
+            encoded_words, mask = encode_str(input_seq, word2vec_vocab, MAX_SEQ_LEN)
+            encoded_sequences.append(encoded_words)
+            masks.append(mask)
 
-        # Last word.
-        pred_word = word2vec_vocab[words[idx]]
-        target_vals.append(pred_word)
+            # Output word.
+            pred_word = word2vec_vocab[response[i]]
+            target_vals.append(pred_word)
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
     masks = np.vstack(masks).astype('int32')
 
-    y = np.vstack(target_vals).astype('int32')
+    X_train = {'X': encoded_sequences, 'X_mask': masks}
+    y_train = np.vstack(target_vals).astype('int32')
+
+    # Test data.
+    encoded_sequences = []
+    masks = []
+    target_vals = []
+    for query, response in test_sent_pairs:
+        # Remove out-of-vocabulary words.
+        query = [w for w in query if w in word2vec_vocab]
+        response = [w for w in response if w in word2vec_vocab]
+        
+        if not query or not response:
+            continue
+
+        # If query sequence exceeds maximum length, continue to next sentence pair.
+        if len(query) > MAX_SEQ_LEN:
+            continue
+
+        encoded_words, mask = encode_str(query, word2vec_vocab, MAX_SEQ_LEN)
+        encoded_sequences.append(encoded_words)
+        masks.append(mask)
+
+        # TODO: use response also, so I can see the difference between predicted and actual.
+
+    encoded_sequences = np.vstack(encoded_sequences).astype('int32')
+    masks = np.vstack(masks).astype('int32')
+
+    X_test = {'X': encoded_sequences, 'X_mask': masks}
 
     output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU, learning_rate)
 
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
-
-    split_idx = 9000
-    X_train = {'X': encoded_sequences[:split_idx], 'X_mask': masks[:split_idx]}
-    y_train = y[:split_idx]
-    X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
-    #y_test = y[split_idx:]
     
     train = False
     load = True
