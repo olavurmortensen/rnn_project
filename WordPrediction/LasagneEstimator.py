@@ -198,9 +198,9 @@ if __name__ == "__main__":
     X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
     #y_test = y[split_idx:]
     
-    train = False
-    load = True
-    test = True
+    train = True
+    load = False
+    test = False
     if train:
         estimator.fit(X_train, y_train)
     if load:
