@@ -127,7 +127,7 @@ if __name__ == "__main__":
     print "Num word vectors %i" % len(word2vec_vocab)
 
     # Load data.
-    data = pickle.load(open('data/OpenSubtitlesSentences', 'rb'))
+    data = pickle.load(open('data/OpenSubtitlesSentences.pickle', 'rb'))
     sentences = data['sentences']
     sent_pairs = data['grouped_sentences']
     train_sent_pairs = sent_pairs[:train_split]
@@ -174,10 +174,6 @@ if __name__ == "__main__":
 
         # Training examples.
         for i in range(len(response)):
-            # If sequence exceeds maximum length, continue to next sentence pair.
-            if len(input_seq) > MAX_SEQ_LEN:
-                break
-
             # Input sequence.
             if i == 0:
                 input_seq = query
@@ -190,6 +186,10 @@ if __name__ == "__main__":
             # Output word.
             pred_word = word2vec_vocab[response[i]]
             target_vals.append(pred_word)
+
+            # If sequence exceeds maximum length, continue to next sentence pair.
+            if len(input_seq) >= MAX_SEQ_LEN:
+                break
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
     masks = np.vstack(masks).astype('int32')
@@ -228,21 +228,51 @@ if __name__ == "__main__":
 
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
-    
+
     train = False
     load = True
     test = True
     if train:
         estimator.fit(X_train, y_train)
     if load:
-        estimator.load_weights_from('word_embedding/saved_params_42')
+        estimator.load_weights_from('word_embedding/saved_params_64')
     if test:
-        predictions = estimator.predict(X_test)
-        predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
+        pred_sents = []
+        # For each test example, predict the response.
+        for idx in xrange(X_test['X'].shape[0]):
+            pred_words = []
+
+            temp = X_test['X'][idx].reshape(1, MAX_SEQ_LEN)
+            X_new = np.empty_like(temp)
+            X_new[:] = temp
+
+            temp = X_test['X_mask'][idx].reshape(1, MAX_SEQ_LEN)
+            X_mask_new = np.empty_like(temp)
+            X_mask_new[:] = temp
+            # Predict one word at a time, based on the previous predicted words and the query.
+            for pred_iter in range(10):  # FIXME: predicting 10 words. To stop predicting, make the model predict <EOS>.
+                zero_found = False
+                prediction = estimator.predict({'X': X_new, 'X_mask': X_mask_new})  # Predict current sequence.
+                prediction = prediction.reshape(-1, num_words + 1).argmax(axis=-1)[0]  # Take the argmax of the softmax output.
+                pred_words.append(prediction)
+                # Find where to place the prediction in X and X_mask.
+                for i, elem in enumerate(X_mask_new[0]):
+                    if elem == 0:
+                        zero_found = True
+                        X_mask_new[0, i] = 1
+                        X_new[0, i] = prediction
+                        break
+                if zero_found == False:
+                    # Can't predict more because of MAX_SEQ_LEN.
+                    break
+            pred_sents.append(pred_words)
+
+        # Find words corresponding to the integer tokens in the query and predicted response, and print them.
         word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))
-        for idx in xrange(len(predictions)):
-            line = X_test['X'][idx][X_test['X_mask'][idx].astype('bool')]
-            print [word2vec_vocab_rev[w] for w in line]
-            print word2vec_vocab_rev[predictions[idx]]
+        for idx in xrange(len(pred_sents)):
+            query = X_test['X'][idx][X_test['X_mask'][idx].astype('bool')]  # Apply mask to query.
+            print 'Query: %r' % [word2vec_vocab_rev[w] for w in query]
+            response = [word2vec_vocab_rev[w] for w in pred_sents[idx]]
+            print 'Response: %r' % response
         import pdb
         pdb.set_trace()
