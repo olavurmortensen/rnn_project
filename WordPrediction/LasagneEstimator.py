@@ -53,16 +53,27 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
     l_mask = lasagne.layers.InputLayer((None, MAX_SEQ_LEN), name='input_mask')
 
-    l_gru = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='gru', mask_input=l_mask)
-    print "gru shape: %s" % str(lasagne.layers.get_output(l_gru, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    l_rec_for = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='rec_for', mask_input=l_mask)
+    print "rec_for shape: %s" % str(lasagne.layers.get_output(l_rec_for, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
         {x_sym: X, xmask_sym: Xmask}).shape)
-
+   
     # slice last index of dimension 1
-    l_last_hid = lasagne.layers.SliceLayer(l_gru, indices=-1, axis=1, name='l_last_hid')
-    print  "l_last_hid shape: %s" % str(lasagne.layers.get_output(l_last_hid, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    l_last_hid_for = lasagne.layers.SliceLayer(l_rec_for, indices=-1, axis=1, name='last_hid_for')
+    print  "last_hid_for shape: %s" % str(lasagne.layers.get_output(l_last_hid_for, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+        {x_sym: X, xmask_sym: Xmask}).shape)
+    
+    l_rec_bac = lasagne.layers.LSTMLayer(l_emb, backwards=True, num_units=NUM_UNITS_GRU, name='rec_bac', mask_input=l_mask)
+    print "rec_bac shape: %s" % str(lasagne.layers.get_output(l_rec_bac, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+        {x_sym: X, xmask_sym: Xmask}).shape)
+    
+    # slice last index of dimension 1
+    l_last_hid_bac = lasagne.layers.SliceLayer(l_rec_bac, indices=-1, axis=1, name='last_hid_bac')
+    print  "last_hid_bac shape: %s" % str(lasagne.layers.get_output(l_last_hid_bac, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
         {x_sym: X, xmask_sym: Xmask}).shape)
 
-    l_softmax = lasagne.layers.DenseLayer(l_last_hid, num_units=NUM_OUTPUTS,
+    l_concat = lasagne.layers.ConcatLayer(incomings=[l_last_hid_for, l_last_hid_bac], name='concat')
+
+    l_softmax = lasagne.layers.DenseLayer(l_concat, num_units=NUM_OUTPUTS,
                                           nonlinearity=lasagne.nonlinearities.softmax,
                                           name='softmax')
     print "l_softmax = DenseLayer: %s" % str(lasagne.layers.get_output(l_softmax, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
