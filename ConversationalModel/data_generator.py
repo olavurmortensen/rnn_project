@@ -22,7 +22,8 @@ def load_sentences(num_sents=None):
     Example:
     sentences = load_sentences(num_sents=1000)
     '''
-    data_folder = '/home/olavur/Dropbox/my_folder/DTU/RNN/data/OpenSubtitles/en'
+    #data_folder = '/home/olavur/Dropbox/my_folder/DTU/RNN/data/OpenSubtitles/en'
+    data_folder = '/zhome/14/2/64409/OpenSubtitles/en'
 
     data_filenames = []
     for (dirpath, dirnames, filenames) in os.walk(data_folder):

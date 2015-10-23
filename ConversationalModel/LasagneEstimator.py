@@ -192,7 +192,7 @@ if __name__ == "__main__":
                 break
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
-    masks = np.vstack(masks).astype('int32')
+    masks = np.vstack(masks).astype('float32')
 
     X_train = {'X': encoded_sequences, 'X_mask': masks}
     y_train = np.vstack(target_vals).astype('int32')
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         # TODO: use response also, so I can see the difference between predicted and actual.
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
-    masks = np.vstack(masks).astype('int32')
+    masks = np.vstack(masks).astype('float32')
 
     X_test = {'X': encoded_sequences, 'X_mask': masks}
 
@@ -229,9 +229,9 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    train = False
-    load = True
-    test = True
+    train = True
+    load = False
+    test = False
     if train:
         estimator.fit(X_train, y_train)
     if load:
