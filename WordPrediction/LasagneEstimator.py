@@ -124,6 +124,7 @@ if __name__ == "__main__":
     learning_rate = 0.001
     momentum = 0.9
     MIN_WORD_FREQ = 5
+    split_idx = 450000
 
     NUM_UNITS_GRU = 150
     BATCH_SIZE = 128
@@ -194,7 +195,7 @@ if __name__ == "__main__":
         target_vals.append(pred_word)
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
-    masks = np.vstack(masks).astype('int32')
+    masks = np.vstack(masks).astype('float32')
 
     y = np.vstack(target_vals).astype('int32')
 
@@ -203,20 +204,17 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    split_idx = 9000
     X_train = {'X': encoded_sequences[:split_idx], 'X_mask': masks[:split_idx]}
     y_train = y[:split_idx]
     X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
     #y_test = y[split_idx:]
     
     train = True
-    load = False
     test = False
     if train:
         estimator.fit(X_train, y_train)
-    if load:
-        estimator.load_weights_from('word_embedding/saved_params_42')
     if test:
+        estimator.load_weights_from('word_embedding/saved_params_42')
         predictions = estimator.predict(X_test)
         predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
         word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))
