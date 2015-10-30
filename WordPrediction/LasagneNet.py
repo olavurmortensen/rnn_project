@@ -74,6 +74,7 @@ class LasagneNet:
                  train_func,
                  test_func,
                  predict_func,
+                 get_hidden_func,
                  batch_iterator_train=BatchIterator(128),
                  batch_iterator_test=BatchIterator(128),
                  max_epochs=1000,
@@ -93,6 +94,7 @@ class LasagneNet:
         self.train_func = train_func
         self.test_func = test_func
         self.predict_func = predict_func
+        self.get_hidden_func = get_hidden_func
         self.is_regression = is_regression
 
         self.layers = {layer.name:layer for layer in lasagne.layers.get_all_layers(output_layer)}
@@ -224,6 +226,13 @@ class LasagneNet:
         for Xb, yb in batch_iterator(X):
             predictions += list(self.predict_func(**Xb)[0].reshape((-1,1)))
         return np.asarray(predictions)
+
+    def get_hidden_repr(self, X):
+        batch_iterator = BatchIterator(1024*32)
+        hidden_repr = []
+        for Xb, yb in batch_iterator(X):
+            hidden_repr.append(list(self.get_hidden_func(**Xb)))
+        return np.asarray(hidden_repr)
 
 
     # def predict(self, X, batch_size):

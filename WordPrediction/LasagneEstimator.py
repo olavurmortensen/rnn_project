@@ -94,8 +94,9 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     all_trainable_parameters = lasagne.layers.get_all_params([l_softmax], trainable=True)
 
     #add grad clipping to avoid exploding gradients
-    all_grads = [T.clip(g, -3, 3) for g in T.grad(mean_cost, all_trainable_parameters)]
-    all_grads = lasagne.updates.total_norm_constraint(all_grads, 3)
+    clip_level = 10
+    all_grads = [T.clip(g, -clip_level, clip_level) for g in T.grad(mean_cost, all_trainable_parameters)]
+    all_grads = lasagne.updates.total_norm_constraint(all_grads, clip_level)
 
     updates = lasagne.updates.adam(
             all_grads,
@@ -105,6 +106,12 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     train_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc], updates=updates)
     test_func = theano.function([x_sym, y_sym, xmask_sym], [mean_cost, acc])
     predict_func = theano.function([x_sym, xmask_sym], [output_train])
+
+    hidden_repr = lasagne.layers.get_output(l_concat,
+            inputs={l_in: x_sym, l_mask: xmask_sym},
+            deterministic=False)
+
+    get_hidden_func = theano.function([x_sym, xmask_sym], [hidden_repr])
 
     # when the input X is a dict, the following definitions will allow LasagneNet to call train_func without
     # knowing the order of the inputs, using the syntax train_function(**X)
@@ -117,33 +124,34 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     def predict_function(X, X_mask):
         return predict_func(X, X_mask)
 
-    return l_softmax, train_function, test_function, predict_function
+    def get_hidden_function(X, X_mask):
+        return get_hidden_func(X, X_mask)
+
+    return l_softmax, train_function, test_function, predict_function, get_hidden_function
 
 
 if __name__ == "__main__":
     learning_rate = 0.001
     momentum = 0.9
     MIN_WORD_FREQ = 5
-    split_idx = 450000
+    split_idx = 9000
 
-    NUM_UNITS_GRU = 150
+    NUM_UNITS_GRU = 500
     BATCH_SIZE = 128
     MAX_SEQ_LEN = 10
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.
-    WEIGHTS = np.load('data/small_vocab_word_vecs.npy').astype('float32')
-    with open('data/small_vocab_word_vocab', 'rb') as f:
+    #WEIGHTS = np.load('data/word_embeddings_vecs.pickle').astype('float32')
+    with open('data/word_embeddings_vecs.pickle', 'rb') as f:
+        WEIGHTS = pickle.load(f)
+    with open('data/word_embeddings_vocab.pickle', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
-    # Load list of sentences from OpenSubtitles data (each sentence is a list of words).
-    try:
-        with open('data/OpenSubtitlesSentences', 'rb') as f:
-            sentences = pickle.load(f)
-    except IOError:
-        sentences = load_sentences(10000)
-        pickle.dump(sentences, open('data/OpenSubtitlesSentences', 'wb'))
+    # Load data.
+    data = pickle.load(open('data/OpenSubtitlesSentences.pickle', 'rb'))
+    sentences = data['sentences']
 
     # Find the set of words that are in the data (and their frequencies).
     word_set = {}
@@ -199,9 +207,9 @@ if __name__ == "__main__":
 
     y = np.vstack(target_vals).astype('int32')
 
-    output_layer, train_func, test_func, predict_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU, learning_rate)
+    output_layer, train_func, test_func, predict_func, get_hidden_func = word_prediction_network(BATCH_SIZE, word_embedding_size, num_words, MAX_SEQ_LEN, WEIGHTS, NUM_UNITS_GRU, learning_rate)
 
-    estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
+    estimator = LasagneNet(output_layer, train_func, test_func, predict_func, get_hidden_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
     X_train = {'X': encoded_sequences[:split_idx], 'X_mask': masks[:split_idx]}
@@ -209,12 +217,11 @@ if __name__ == "__main__":
     X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
     #y_test = y[split_idx:]
     
-    train = True
-    test = False
+    train = False
     if train:
         estimator.fit(X_train, y_train)
-    if test:
-        estimator.load_weights_from('word_embedding/saved_params_42')
+    else:
+        estimator.load_weights_from('word_embedding/saved_params_2')
         predictions = estimator.predict(X_test)
         predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
         word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))

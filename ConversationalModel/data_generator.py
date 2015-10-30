@@ -73,6 +73,11 @@ if __name__ == '__main__':
     sentences = load_sentences(NUM_SENTENCES)
     logging.info('#Sentences after load: %d', len(sentences))
 
+    temp = []
+    for sentence in sentences:
+        temp.append([w for w in sentence if w.isalpha()])
+    sentences = temp
+
     grouped_sentences = group_sentences(sentences)
     logging.info('#Sentence pairs after group: %d', len(grouped_sentences))
 
