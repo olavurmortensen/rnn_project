@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     NUM_UNITS_GRU = 150
     BATCH_SIZE = 128
-    MAX_SEQ_LEN = 5  # TODO: value?
+    MAX_SEQ_LEN = 10
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.

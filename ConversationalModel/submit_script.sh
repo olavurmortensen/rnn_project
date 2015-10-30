@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=1:gpus=1
-#PBS -l walltime=00:10:00
+#PBS -l walltime=24:00:00
 #PBS -q visual
 
 # Run as "qsub submit_script.sh"

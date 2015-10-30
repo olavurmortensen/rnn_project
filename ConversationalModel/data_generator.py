@@ -69,7 +69,7 @@ def randomize_sentences(sentences):
 
 
 if __name__ == '__main__':
-    NUM_SENTENCES = 10000
+    NUM_SENTENCES = 500000
     sentences = load_sentences(NUM_SENTENCES)
     logging.info('#Sentences after load: %d', len(sentences))
 

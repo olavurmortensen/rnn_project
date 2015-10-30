@@ -113,7 +113,7 @@ if __name__ == "__main__":
     learning_rate = 0.001
     momentum = 0.9
     MIN_WORD_FREQ = 5
-    train_split = 9000
+    train_split = 450000
 
     NUM_UNITS_GRU = 150
     BATCH_SIZE = 128
@@ -229,14 +229,12 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    train = True
-    load = False
-    test = False
+    train = False
+    test = load
     if train:
         estimator.fit(X_train, y_train)
-    if load:
-        estimator.load_weights_from('word_embedding/saved_params_64')
     if test:
+        estimator.load_weights_from('word_embedding/saved_params_129')
         pred_sents = []
         # For each test example, predict the response.
         for idx in xrange(X_test['X'].shape[0]):
