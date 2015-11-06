@@ -131,10 +131,10 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.001
+    learning_rate = 0.0001
     momentum = 0.9
     MIN_WORD_FREQ = 5
-    split_idx = 9000
+    split_idx = 999990
 
     NUM_UNITS_GRU = 500
     BATCH_SIZE = 128
@@ -214,14 +214,15 @@ if __name__ == "__main__":
 
     X_train = {'X': encoded_sequences[:split_idx], 'X_mask': masks[:split_idx]}
     y_train = y[:split_idx]
-    X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
+    X_test = {'X': encoded_sequences[(encoded_sequences.shape[0]-100):], 'X_mask': masks[(encoded_sequences.shape[0]-100):]}
+    #X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
     #y_test = y[split_idx:]
     
     train = False
     if train:
         estimator.fit(X_train, y_train)
     else:
-        estimator.load_weights_from('word_embedding/saved_params_2')
+        estimator.load_weights_from('word_embedding/saved_params_20')
         predictions = estimator.predict(X_test)
         predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
         word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))

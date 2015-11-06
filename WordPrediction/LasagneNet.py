@@ -254,6 +254,7 @@ class LasagneNet:
 
     def train_loop(self, X, y):
         X_train, X_test, y_train, y_test = self.split_data(X,y)
+        num_train_samples = len(y_train)
 
         on_epoch_finished = self.on_epoch_finished
         if not isinstance(on_epoch_finished, (list, tuple)):
@@ -278,8 +279,8 @@ class LasagneNet:
             for Xb, yb in self.batch_iterator_train(X_train, y_train):
                 # batch_cost, batch_acc = self.train_func(Xb['X'], yb.reshape((1,-1)), Xb['X_mask'])
                 batch_counter += 1
-                if batch_counter % 25==0:
-                    print ("Finished batch number %i" % batch_counter)
+                #if batch_counter % 25 == 0:
+                #    print ("Finished batch number %i" % batch_counter)
                 # Xb['y'] = yb.reshape((1,-1))
                 Xb['y'] = yb
 
