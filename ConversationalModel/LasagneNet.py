@@ -269,8 +269,8 @@ class LasagneNet:
             for Xb, yb in self.batch_iterator_train(X_train, y_train):
                 # batch_cost, batch_acc = self.train_func(Xb['X'], yb.reshape((1,-1)), Xb['X_mask'])
                 batch_counter += 1
-                if batch_counter % 2000==0:
-                    print ("Finished batch number %i" % batch_counter)
+                #if batch_counter % 2000==0:
+                #    print ("Finished batch number %i" % batch_counter)
                 # Xb['y'] = yb.reshape((1,-1))
                 Xb['y'] = yb
 

@@ -53,16 +53,36 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
     l_mask = lasagne.layers.InputLayer((None, MAX_SEQ_LEN), name='input_mask')
 
-    l_gru = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='gru', mask_input=l_mask)
-    print "gru shape: %s" % str(lasagne.layers.get_output(l_gru, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    l_rec_for = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='rec_for', mask_input=l_mask)
+    print "rec_for shape: %s" % str(lasagne.layers.get_output(l_rec_for, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
         {x_sym: X, xmask_sym: Xmask}).shape)
-
+   
     # slice last index of dimension 1
-    l_last_hid = lasagne.layers.SliceLayer(l_gru, indices=-1, axis=1, name='l_last_hid')
-    print  "l_last_hid shape: %s" % str(lasagne.layers.get_output(l_last_hid, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    l_last_hid_for = lasagne.layers.SliceLayer(l_rec_for, indices=-1, axis=1, name='last_hid_for')
+    print  "last_hid_for shape: %s" % str(lasagne.layers.get_output(l_last_hid_for, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+        {x_sym: X, xmask_sym: Xmask}).shape)
+    
+    l_rec_bac = lasagne.layers.LSTMLayer(l_emb, backwards=True, num_units=NUM_UNITS_GRU, name='rec_bac', mask_input=l_mask)
+    print "rec_bac shape: %s" % str(lasagne.layers.get_output(l_rec_bac, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+        {x_sym: X, xmask_sym: Xmask}).shape)
+    
+    # slice last index of dimension 1
+    l_last_hid_bac = lasagne.layers.SliceLayer(l_rec_bac, indices=-1, axis=1, name='last_hid_bac')
+    print  "last_hid_bac shape: %s" % str(lasagne.layers.get_output(l_last_hid_bac, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
         {x_sym: X, xmask_sym: Xmask}).shape)
 
-    l_softmax = lasagne.layers.DenseLayer(l_last_hid, num_units=NUM_OUTPUTS,
+    l_concat = lasagne.layers.ConcatLayer(incomings=[l_last_hid_for, l_last_hid_bac], name='concat')
+
+    #l_gru = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='gru', mask_input=l_mask)
+    #print "gru shape: %s" % str(lasagne.layers.get_output(l_gru, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    #    {x_sym: X, xmask_sym: Xmask}).shape)
+
+    ## slice last index of dimension 1
+    #l_last_hid = lasagne.layers.SliceLayer(l_gru, indices=-1, axis=1, name='l_last_hid')
+    #print  "l_last_hid shape: %s" % str(lasagne.layers.get_output(l_last_hid, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
+    #    {x_sym: X, xmask_sym: Xmask}).shape)
+
+    l_softmax = lasagne.layers.DenseLayer(l_concat, num_units=NUM_OUTPUTS,
                                           nonlinearity=lasagne.nonlinearities.softmax,
                                           name='softmax')
     print "l_softmax = DenseLayer: %s" % str(lasagne.layers.get_output(l_softmax, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
@@ -83,8 +103,9 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     all_trainable_parameters = lasagne.layers.get_all_params([l_softmax], trainable=True)
 
     #add grad clipping to avoid exploding gradients
-    all_grads = [T.clip(g, -3, 3) for g in T.grad(mean_cost, all_trainable_parameters)]
-    all_grads = lasagne.updates.total_norm_constraint(all_grads, 3)
+    clip_level = 10
+    all_grads = [T.clip(g, -clip_level, clip_level) for g in T.grad(mean_cost, all_trainable_parameters)]
+    all_grads = lasagne.updates.total_norm_constraint(all_grads, clip_level)
 
     updates = lasagne.updates.adam(
             all_grads,
@@ -110,28 +131,35 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.001
+    learning_rate = 0.0001
     momentum = 0.9
     MIN_WORD_FREQ = 5
-    train_split = 450000
+    train_split = 10000
+    test_split = train_split + 100
 
-    NUM_UNITS_GRU = 150
+    NUM_UNITS_GRU = 500
     BATCH_SIZE = 128
     MAX_SEQ_LEN = 10
     EOS = -1
 
     # Load vocabulary and pre-trained word2vec word vectors.
-    WEIGHTS = np.load('data/small_vocab_word_vecs.npy').astype('float32')
-    with open('data/small_vocab_word_vocab', 'rb') as f:
+    #WEIGHTS = np.load('data/word_embeddings_vecs.pickle').astype('float32')
+    with open('data/word_embeddings_vecs.pickle', 'rb') as f:
+        WEIGHTS = pickle.load(f)
+    with open('data/word_embeddings_vocab.pickle', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
     # Load data.
-    data = pickle.load(open('data/OpenSubtitlesSentences.pickle', 'rb'))
+    with open('data/OpenSubtitlesSentences.pickle', 'rb') as f:
+        data = pickle.load(f)
     sentences = data['sentences']
     sent_pairs = data['grouped_sentences']
     train_sent_pairs = sent_pairs[:train_split]
-    test_sent_pairs = sent_pairs[train_split:]
+    test_sent_pairs = sent_pairs[train_split:test_split]
+
+    logging.info('Training examples: %d', len(train_sent_pairs))
+    logging.info('Test examples: %d', len(test_sent_pairs))
     
     # Find the set of words that are in the data (and their frequencies).
     word_set = {}
@@ -229,11 +257,10 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    train = False
-    test = load
+    train = True
     if train:
         estimator.fit(X_train, y_train)
-    if test:
+    else:
         estimator.load_weights_from('word_embedding/saved_params_129')
         pred_sents = []
         # For each test example, predict the response.
