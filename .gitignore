@@ -11,9 +11,9 @@ OpenSubtitlesSentences
 OpenSubtitlesSentences.pickle
 
 *.pyc
+*.pickle
 *.swp
 *.swo
-*.pickle
 
 # DTU HPC job log files.
 *.sh.e*
