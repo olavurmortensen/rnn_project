@@ -6,7 +6,6 @@ Sequence learning using LasagneNet.
 
 from __future__ import absolute_import
 
-from data_generator import load_sentences
 from LasagneNet import *
 from RepeatLayer import RepeatLayer
 import os
@@ -16,6 +15,10 @@ import theano.tensor as T
 import numpy as np
 import theano
 import cPickle as pickle
+from math import ceil
+import sys
+
+import pdb
 
 import logging
 
@@ -131,10 +134,15 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.0001
-    momentum = 0.9
+    try:
+        learning_rate = float(sys.argv[1])
+    except IndexError:
+        learning_rate = 0.0001
+    momentum = 0.9  # NOTE: not used a.t.m.
     MIN_WORD_FREQ = 5
-    split_idx = 999990
+    min_train_sent_len = 2
+    train_split = 100000
+    test_split = train_split + 100
 
     NUM_UNITS_GRU = 500
     BATCH_SIZE = 128
@@ -143,14 +151,14 @@ if __name__ == "__main__":
 
     # Load vocabulary and pre-trained word2vec word vectors.
     #WEIGHTS = np.load('data/word_embeddings_vecs.pickle').astype('float32')
-    with open('data/word_embeddings_vecs.pickle', 'rb') as f:
+    with open('../data/word_embeddings_vecs.pickle', 'rb') as f:
         WEIGHTS = pickle.load(f)
-    with open('data/word_embeddings_vocab.pickle', 'rb') as f:
+    with open('../data/word_embeddings_vocab.pickle', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
     # Load data.
-    data = pickle.load(open('data/OpenSubtitlesSentences.pickle', 'rb'))
+    data = pickle.load(open('../data/OpenSubtitlesSentences.pickle', 'rb'))
     sentences = data['sentences']
 
     # Find the set of words that are in the data (and their frequencies).
@@ -185,22 +193,22 @@ if __name__ == "__main__":
     for sentence in sentences:
         words = [w for w in sentence if w in word2vec_vocab]
         
-        if not words:
+        if len(words) < min_train_sent_len:
             continue
 
-        # Words up to the last word.
-        encoded_words, mask = encode_str(words[:-1], word2vec_vocab, MAX_SEQ_LEN)
-        encoded_sequences.append(encoded_words)
-        masks.append(mask)
+        pred_idx = int(ceil(len(words)/float(2)))  # First word to predict: the middle, rounding up.
+        for i in range(pred_idx, len(words)):
+            # Words to predict based on.
+            encoded_words, mask = encode_str(words[:i], word2vec_vocab, MAX_SEQ_LEN)
+            encoded_sequences.append(encoded_words)
+            masks.append(mask)
 
-        if len(words) > MAX_SEQ_LEN:
-            idx = MAX_SEQ_LEN
-        else:
-            idx = -1
-
-        # Last word.
-        pred_word = word2vec_vocab[words[idx]]
-        target_vals.append(pred_word)
+            # Word to predict.
+            pred_word = word2vec_vocab[words[i]]
+            target_vals.append(pred_word)
+            
+            if i - 1 == MAX_SEQ_LEN:
+                break
 
     encoded_sequences = np.vstack(encoded_sequences).astype('int32')
     masks = np.vstack(masks).astype('float32')
@@ -212,11 +220,10 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, get_hidden_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    X_train = {'X': encoded_sequences[:split_idx], 'X_mask': masks[:split_idx]}
-    y_train = y[:split_idx]
-    X_test = {'X': encoded_sequences[(encoded_sequences.shape[0]-100):], 'X_mask': masks[(encoded_sequences.shape[0]-100):]}
-    #X_test = {'X': encoded_sequences[split_idx:], 'X_mask': masks[split_idx:]}
-    #y_test = y[split_idx:]
+    X_train = {'X': encoded_sequences[:train_split], 'X_mask': masks[:train_split]}
+    y_train = y[:train_split]
+    X_test = {'X': encoded_sequences[], 'X_mask': masks[train_split:test_split]}
+    #y_test = y[train_split:test_split]
     
     train = False
     if train:

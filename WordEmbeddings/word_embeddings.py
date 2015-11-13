@@ -16,7 +16,7 @@ class SentenceGenerator(object):
             yield item
 
 if __name__ == '__main__':
-    with open('data/OpenSubtitlesSentences.pickle', 'rb') as f:
+    with open('../data/OpenSubtitlesSentences.pickle', 'rb') as f:
         data = pickle.load(f)
     sentences = data['sentences']
 
