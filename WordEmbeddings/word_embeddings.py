@@ -16,7 +16,8 @@ class SentenceGenerator(object):
             yield item
 
 if __name__ == '__main__':
-    data = pickle.load(open('data/OpenSubtitlesSentences.pickle', 'rb'))
+    with open('data/OpenSubtitlesSentences.pickle', 'rb') as f:
+        data = pickle.load(f)
     sentences = data['sentences']
 
     model = Word2Vec(SentenceGenerator(sentences), size=500, workers=8)
@@ -25,5 +26,5 @@ if __name__ == '__main__':
     for word, vocab_object in model.vocab.items():
         vocab[word] = vocab_object.index
 
-    pickle.dump(model.syn0, open('data/word_embeddings_vecs.pickle', 'wb'))
-    pickle.dump(vocab, open('data/word_embeddings_vocab.pickle', 'wb'))
+    pickle.dump(model.syn0, open('../data/word_embeddings_vecs.pickle', 'wb'))
+    pickle.dump(vocab, open('../data/word_embeddings_vocab.pickle', 'wb'))

@@ -22,8 +22,8 @@ def load_sentences(num_sents=None):
     Example:
     sentences = load_sentences(num_sents=1000)
     '''
-    #data_folder = '/home/olavur/Dropbox/my_folder/DTU/RNN/data/OpenSubtitles/en'
-    data_folder = '/zhome/14/2/64409/OpenSubtitles/en'
+    data_folder = '/home/olavur/OpenSubtitles/en'
+    #data_folder = '/zhome/14/2/64409/OpenSubtitles/en'
 
     data_filenames = []
     for (dirpath, dirnames, filenames) in os.walk(data_folder):
@@ -69,23 +69,27 @@ def randomize_sentences(sentences):
 
 
 if __name__ == '__main__':
-    NUM_SENTENCES = 5000000
+    NUM_SENTENCES = 1000000
     sentences = load_sentences(NUM_SENTENCES)
     logging.info('#Sentences after load: %d', len(sentences))
 
-    temp = []
-    for sentence in sentences:
-        temp.append([w for w in sentence if w.isalpha()])
-    sentences = temp
+    #temp = []
+    #for sentence in sentences:
+    #    temp.append([w for w in sentence if w.isalpha()])
+    #sentences = temp
 
     grouped_sentences = group_sentences(sentences)
     logging.info('#Sentence pairs after group: %d', len(grouped_sentences))
 
     grouped_sentences = randomize_sentences(grouped_sentences)
-    logging.info('#Sentence pairs after randomize: %d', len(grouped_sentences))
+    logging.info('#Sentence pairs after randomize grouped sentences: %d', len(grouped_sentences))
+
+    rand_sentences = randomize_sentences(sentences)
+    logging.info('#Sentences after randomize: %d', len(rand_sentences))
 
     data = {}
-    data['sentences'] = sentences
+    data['sentences'] = rand_sentences
     data['grouped_sentences'] = grouped_sentences
 
-    pickle.dump(data, open('data/OpenSubtitlesSentences.pickle', 'wb'))
+    with open('../data/OpenSubtitlesSentences.pickle', 'wb') as f:
+        pickle.dump(data, f)
