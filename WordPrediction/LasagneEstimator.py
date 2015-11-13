@@ -41,7 +41,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     X = np.random.randint(0, NUM_WORDS, size=(BATCH_SIZE, MAX_SEQ_LEN)).astype('int32')
     Xmask = np.ones((BATCH_SIZE, MAX_SEQ_LEN)).astype('float32')
 
-    l_in = lasagne.layers.InputLayer((None, MAX_SEQ_LEN), name='input')  # TODO: BATCH_SIZE instead of "None"?
+    l_in = lasagne.layers.InputLayer((BATCH_SIZE, MAX_SEQ_LEN), name='input')  # TODO: BATCH_SIZE instead of "None"?
     print "l_in shape: %s" % str((lasagne.layers.get_output(l_in, inputs={l_in: x_sym}).eval({x_sym: X}).shape))
 
     l_emb = lasagne.layers.EmbeddingLayer(l_in, NUM_WORDS, EMBEDDING_SIZE,
@@ -51,7 +51,7 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     l_emb.params[l_emb.W].remove('trainable')
     print "l_emb shape: %s" % str((lasagne.layers.get_output(l_emb, inputs={l_in: x_sym}).eval({x_sym: X}).shape))
 
-    l_mask = lasagne.layers.InputLayer((None, MAX_SEQ_LEN), name='input_mask')
+    l_mask = lasagne.layers.InputLayer((BATCH_SIZE, MAX_SEQ_LEN), name='input_mask')
 
     l_rec_for = lasagne.layers.LSTMLayer(l_emb, num_units=NUM_UNITS_GRU, name='rec_for', mask_input=l_mask)
     print "rec_for shape: %s" % str(lasagne.layers.get_output(l_rec_for, inputs={l_in: x_sym, l_mask: xmask_sym}).eval(
