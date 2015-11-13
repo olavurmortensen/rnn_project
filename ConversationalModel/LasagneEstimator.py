@@ -10,12 +10,14 @@ from data_generator import load_sentences
 from LasagneNet import *
 from RepeatLayer import RepeatLayer
 import os
+import sys
 from time import time
 import lasagne
 import theano.tensor as T
 import numpy as np
 import theano
 import cPickle as pickle
+import pdb
 
 import logging
 
@@ -131,10 +133,13 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
 
 
 if __name__ == "__main__":
-    learning_rate = 0.0001
+    try:
+        learning_rate = float(sys.argv[1])
+    except IndexError:
+        learning_rate = 0.0001
     momentum = 0.9
     MIN_WORD_FREQ = 5
-    train_split = 10000
+    train_split = 1000
     test_split = train_split + 100
 
     NUM_UNITS_GRU = 500
@@ -144,14 +149,14 @@ if __name__ == "__main__":
 
     # Load vocabulary and pre-trained word2vec word vectors.
     #WEIGHTS = np.load('data/word_embeddings_vecs.pickle').astype('float32')
-    with open('data/word_embeddings_vecs.pickle', 'rb') as f:
+    with open('../data/word_embeddings_vecs.pickle', 'rb') as f:
         WEIGHTS = pickle.load(f)
-    with open('data/word_embeddings_vocab.pickle', 'rb') as f:
+    with open('../data/word_embeddings_vocab.pickle', 'rb') as f:
         word2vec_vocab = pickle.load(f)
     print "Num word vectors %i" % len(word2vec_vocab)
 
     # Load data.
-    with open('data/OpenSubtitlesSentences.pickle', 'rb') as f:
+    with open('../data/OpenSubtitlesSentences.pickle', 'rb') as f:
         data = pickle.load(f)
     sentences = data['sentences']
     sent_pairs = data['grouped_sentences']
@@ -197,6 +202,7 @@ if __name__ == "__main__":
         query = [w for w in query if w in word2vec_vocab]
         response = [w for w in response if w in word2vec_vocab]
         
+        # If query or response is empty after OOV words are removed, we continue.
         if not query or not response:
             continue
 
@@ -206,7 +212,7 @@ if __name__ == "__main__":
             if i == 0:
                 input_seq = query
             else:
-                input_seq = query + response[:(i - 1)]
+                input_seq = query + response[:i]
             encoded_words, mask = encode_str(input_seq, word2vec_vocab, MAX_SEQ_LEN)
             encoded_sequences.append(encoded_words)
             masks.append(mask)
@@ -257,11 +263,11 @@ if __name__ == "__main__":
     estimator = LasagneNet(output_layer, train_func, test_func, predict_func, on_epoch_finished=[SaveParams('save_params','word_embedding', save_interval = 1)])
     # estimator.draw_network() # requires networkx package
 
-    train = True
+    train = False
     if train:
         estimator.fit(X_train, y_train)
     else:
-        estimator.load_weights_from('word_embedding/saved_params_129')
+        estimator.load_weights_from('word_embedding/saved_params_3')
         pred_sents = []
         # For each test example, predict the response.
         for idx in xrange(X_test['X'].shape[0]):
