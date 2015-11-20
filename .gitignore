@@ -18,4 +18,5 @@ OpenSubtitlesSentences.pickle
 # DTU HPC job log files.
 *.sh.e*
 *.sh.o*
-
+wordpred*.e*
+wordpred*.o*

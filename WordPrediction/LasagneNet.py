@@ -11,6 +11,10 @@ import numpy as np
 from sklearn.cross_validation import train_test_split
 import cPickle as pickle
 
+import sys
+
+sys.stdout = sys.stderr
+
 class SaveParams(object):
     def __init__(self, name, save_dir, save_interval=10, file_name=None):
         self.name = name

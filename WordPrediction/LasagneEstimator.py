@@ -18,6 +18,8 @@ import cPickle as pickle
 from math import ceil
 import sys
 
+sys.stdout = sys.stderr
+
 import pdb
 
 import logging
@@ -94,6 +96,13 @@ def word_prediction_network(BATCH_SIZE, EMBEDDING_SIZE, NUM_WORDS, MAX_SEQ_LEN, 
     eq = T.eq(argmax, y_sym.flatten())
     acc = T.mean(eq)  #accuracy
 
+    # Sample words from the softmax layer.
+    #rng =  T.raw_random.random_state_type()  # Random state.
+    #new_rng, sample = T.raw_random.multinomial(rng, pvals=output_train)  # Sample from the softmax layer.
+    #sample = T.argmax(sample, axis=1)  # Return the index of the item that was sampled.
+    #eq = T.eq(sample, y_sym.flatten())
+    #acc = T.mean(eq)  #accuracy
+
     all_trainable_parameters = lasagne.layers.get_all_params([l_softmax], trainable=True)
 
     #add grad clipping to avoid exploding gradients
@@ -140,7 +149,7 @@ if __name__ == "__main__":
         learning_rate = 0.0001
     momentum = 0.9  # NOTE: not used a.t.m.
     MIN_WORD_FREQ = 5
-    min_train_sent_len = 2
+    min_train_sent_len = 3
     train_split = 100000
     test_split = train_split + 100
 
@@ -222,20 +231,25 @@ if __name__ == "__main__":
 
     X_train = {'X': encoded_sequences[:train_split], 'X_mask': masks[:train_split]}
     y_train = y[:train_split]
-    X_test = {'X': encoded_sequences[], 'X_mask': masks[train_split:test_split]}
-    #y_test = y[train_split:test_split]
+    X_test = {'X': encoded_sequences[train_split:test_split], 'X_mask': masks[train_split:test_split]}
+    y_test = y[train_split:test_split]
     
     train = False
     if train:
         estimator.fit(X_train, y_train)
     else:
-        estimator.load_weights_from('word_embedding/saved_params_20')
+        estimator.load_weights_from('saved_params')
+        word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))  # Maps indeces to words.
+
         predictions = estimator.predict(X_test)
-        predictions = predictions.reshape(-1, num_words + 1).argmax(axis=-1)
-        word2vec_vocab_rev = dict(zip(word2vec_vocab.values(), word2vec_vocab.keys()))
-        for idx in xrange(len(predictions)):
-            line = X_test['X'][idx][X_test['X_mask'][idx].astype('bool')]
-            print [word2vec_vocab_rev[w] for w in line]
-            print word2vec_vocab_rev[predictions[idx]]
-        import pdb
+        predictions = predictions.reshape(-1, num_words + 1)  # Reshape into #samples x #words.
+        n_pred = predictions.shape[0]
+        for row in range(n_pred):
+            # Sample a word from output probabilities.
+            sample = np.random.multinomial(n=1, pvals=predictions[row,:]).argmax()
+            line = X_test['X'][row]  # Get the input line.
+            line = line[X_test['X_mask'][row].astype('bool')]  # Apply mask.
+            print 'Input: %r' %([word2vec_vocab_rev[w] for w in line])  # Print words in line.
+            print 'Guess:: %r' %(word2vec_vocab_rev[sample])  # Print predicted word.
+            print 'Output: %r' %(word2vec_vocab_rev[y_test[row]])  # Print the correct word.
         pdb.set_trace()

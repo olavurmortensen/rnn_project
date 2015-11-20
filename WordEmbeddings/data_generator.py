@@ -9,6 +9,7 @@ import gzip
 import os
 import random
 import pickle
+import sys
 
 import logging
 
@@ -22,8 +23,8 @@ def load_sentences(num_sents=None):
     Example:
     sentences = load_sentences(num_sents=1000)
     '''
-    data_folder = '/home/olavur/OpenSubtitles/en'
-    #data_folder = '/zhome/14/2/64409/OpenSubtitles/en'
+    #data_folder = '/home/olavur/OpenSubtitles/en'
+    data_folder = '/zhome/14/2/64409/OpenSubtitles/en'
 
     data_filenames = []
     for (dirpath, dirnames, filenames) in os.walk(data_folder):
@@ -69,7 +70,11 @@ def randomize_sentences(sentences):
 
 
 if __name__ == '__main__':
-    NUM_SENTENCES = 1000000
+    try:
+        NUM_SENTENCES = int(sys.argv[1])
+    except IndexError:
+        NUM_SENTENCES = 1000
+
     sentences = load_sentences(NUM_SENTENCES)
     logging.info('#Sentences after load: %d', len(sentences))
 
@@ -91,5 +96,5 @@ if __name__ == '__main__':
     data['sentences'] = rand_sentences
     data['grouped_sentences'] = grouped_sentences
 
-    with open('../data/OpenSubtitlesSentences.pickle', 'wb') as f:
+    with open('tempdata/OpenSubtitlesSentences.pickle', 'wb') as f:
         pickle.dump(data, f)
